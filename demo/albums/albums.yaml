@@ -1,0 +1,13 @@
+# This configuration file is for this folder, it will define how
+# things in this folder act.
+# It will carry a similar structure to site.yaml
+
+breadcrumb: Albums
+layout: /layout/albums.html.mustache
+
+collection:
+  layout: /layout/album.html.mustache
+
+collections:
+  - test1
+  - test2

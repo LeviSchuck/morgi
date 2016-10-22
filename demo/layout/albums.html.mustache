@@ -1,0 +1,11 @@
+{{> header.html.mustache }}
+
+<h1>Albums</h1>
+
+<ul>
+{{#collections}}
+  <li><a href="{{url}}">{{title}}</a></li>
+{{/collections}}
+</ul>
+
+{{> footer.html.mustache }}

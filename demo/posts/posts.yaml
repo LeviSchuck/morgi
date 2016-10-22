@@ -1,0 +1,15 @@
+# albums and posts are different things, here we want something more
+# like a blog!
+
+breadcrumb: Posts
+
+layout: /layout/posts.html.mustache
+
+collections:
+  - "*.md"
+
+collection:
+  order key: date
+  ordering: descending
+  breadcrumb key: title
+  layout: /layout/post.html.mustache

@@ -1,0 +1,15 @@
+# This is an individual album
+# the layout used is defined in albums.yaml as the collections layout
+
+title: Dogs
+
+contents:
+  Dog 1:
+    image: dog1.jpg
+    title: Dog with relatively big eyes
+  Dog 2:
+    image: dog2.jpg
+    title: Dog on wooden deck
+  Dog 3:
+    image: dog3.jpg
+    title: Dog on grass

@@ -1,0 +1,12 @@
+{{> header.html.mustache }}
+
+<h1>{{title}}</h1>
+
+{{#contents}}
+  <p>
+    <h2>{{title}}</h2>
+    <img src="{{image.url}}" />
+  </p>
+{{/contents}}
+
+{{> footer.html.mustache }}

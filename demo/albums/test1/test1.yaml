@@ -1,0 +1,15 @@
+# This is an individual album
+# the layout used is defined in albums.yaml as the collections layout
+
+title: Cats
+
+contents:
+  Cat 1:
+    image: cat1.jpg
+    title: Cat on a laptop
+  Cat 2:
+    image: cat2.jpg
+    title: Cat with bow tie
+  Cat 3:
+    image: cat3.jpg
+    title: Cat roaring

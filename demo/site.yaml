@@ -1,0 +1,11 @@
+# Site configuration, how to start, what to do
+# This is a demo, where first the demo template will be made and then
+# the code to facilitate it will be made.
+
+layout: /layout/index.html.mustache
+
+collections:
+  - albums
+  - posts
+
+output: _site
