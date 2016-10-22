@@ -9,5 +9,5 @@ collection:
   layout: /layout/album.html.mustache
 
 collections:
-  - test1
-  - test2
+  test1:
+  test2:

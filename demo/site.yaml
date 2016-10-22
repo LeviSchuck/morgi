@@ -5,8 +5,8 @@
 layout: /layout/index.html.mustache
 
 collections:
-  - albums
-  - posts
+  albums:
+  posts:
 
 output: _site
 
