@@ -5,6 +5,7 @@ where
 
 import Control.Monad
 import Data.Maybe
+import Data.List
 
 import qualified Data.ByteString as B
 import qualified Data.Yaml as Y
@@ -38,6 +39,7 @@ data CoreConfig col = CoreConfig
   , coreTitle :: Maybe String
   , coreContents :: Maybe Y.Value
   , coreExtras :: Y.Object
+  , coreURL :: String
   } deriving(Show)
 
 instance Y.FromJSON CollectionOrderingDirection where
@@ -83,11 +85,12 @@ instance (Y.FromJSON col) => Y.FromJSON (CoreConfig col) where
     <*> v .:? "title"
     <*> v .:? "contents"
     <*> pure v
+    <*> pure ""
   parseJSON invalid = AT.typeMismatch "config" invalid
 
 instance (Y.ToJSON col) => Y.ToJSON (CoreConfig col) where
   toJSON c = Y.Object $ M.union (M.fromList (catMaybes
-    [ (\x -> "layout" .= x) <$> coreLayout c
+    [ ("layout" .=) <$> coreLayout c
     , ("output" .=) <$> coreOutput c
     , ("breadcrumb" .=) <$> coreBreadcrumb c
     , case coreCollection c of
@@ -98,6 +101,7 @@ instance (Y.ToJSON col) => Y.ToJSON (CoreConfig col) where
         cs -> Just ("collections" .= cs)
     , ("title" .=) <$> coreTitle c
     , ("contents" .=) <$> coreContents c
+    , Just ("url" .= coreURL c)
     ])) (coreExtras c)
 
 newtype Config = Config (CoreConfig Config) deriving (Show)
@@ -114,6 +118,7 @@ emptyConfig = Config (CoreConfig
   , coreTitle = Nothing
   , coreContents = Nothing
   , coreExtras = M.empty
+  , coreURL = ""
   })
 
 switchConfig :: CoreConfig a -> CoreConfig b
@@ -126,6 +131,7 @@ switchConfig config = (CoreConfig
   , coreTitle = coreTitle config
   , coreContents = coreContents config
   , coreExtras = coreExtras config
+  , coreURL = coreURL config
   })
 
 subload :: FilePath -> IO (CoreConfig String)
@@ -139,8 +145,12 @@ subload path = do
         Right x -> return x
     else error ("File does not exist: " ++ path)
 
-loadText :: FilePath -> IO Config
-loadText path = do
+fileName xs = if elem '/' xs
+  then let _:rest=dropWhile (/='/') xs in fileName rest
+  else let name=takeWhile (/='.') xs in name
+
+loadText :: String -> FilePath -> IO Config
+loadText parent path = do
   text <- B.readFile path
   if B.isPrefixOf "---" text
     then do
@@ -149,15 +159,20 @@ loadText path = do
           config = case Y.decodeEither yaml of
             Left err -> error ("YAML could not be parsed in " ++ path ++ " error: " ++ err)
             Right conf -> (switchConfig (conf :: CoreConfig [String]))
-              {coreContents=Just (Y.String (T.decodeUtf8 text2))}
+              { coreContents=Just (Y.String (T.decodeUtf8 text2))
+              , coreURL=parent ++ "/" ++ fileName path
+              }
       return (Config config)
     else return
       (let (Config c) = emptyConfig
-      in Config (c {coreContents = Just (Y.String (T.decodeUtf8 text))})
+      in Config (c
+        { coreContents = Just (Y.String (T.decodeUtf8 text))
+        , coreURL = parent ++ "/" ++ fileName path
+        })
       )
 
-load :: FilePath -> CoreConfig String -> IO Config
-load root config = do
+load :: FilePath -> String -> CoreConfig String -> IO Config
+load root parent config = do
   cols <- forM (coreCollections config) $ \col -> do
     if any (== '*') col
       then do
@@ -165,20 +180,55 @@ load root config = do
         files <- D.listDirectory root
         let filtered = filter (G.match pat) files
             filteredP = map (\x -> root ++ "/" ++ x) filtered
-        forM filteredP loadText
+        forM filteredP (loadText parent)
       else do
         let colroot = root ++ "/" ++ col
         sc <- subload (colroot ++ "/" ++ col ++ ".yaml")
-        scl <- load colroot sc
-        return [scl]
+        Config scl <- load colroot (parent ++ "/" ++ col) sc
+        return [Config scl {coreURL = parent ++ "/" ++ col}]
   let res = (Config ((switchConfig config)
         { coreCollections = concat cols
+        , coreURL = "/"
         }))
   return res
+
+renderMustache :: Y.ToJSON a => FilePath -> String -> String -> a -> IO ()
+renderMustache root layout output config = do
+  let ldir = root ++ "/layout"
+  res <- MS.automaticCompile [ldir] layout
+  template <- case res of
+    Left e -> fail (show e)
+    Right t -> return t
+  let rendered = MS.substitute template (Y.toJSON config)
+      utf8render = T.encodeUtf8 rendered
+  B.writeFile output utf8render
 
 render :: FilePath -> IO ()
 render root = do
   config <- subload (root ++ "/site.yaml")
-  lconfig <- load root config
-  -- B.writeFile "test.yaml" (Y.encode lconfig)
-  putStrLn (show lconfig)
+  Config lconfig <- load root "" config
+  -- We expect the root to have a layout which will be the
+  -- index.html we are looking for, as well as an output.
+  let output = case coreOutput lconfig of
+        Nothing -> error "Output needed on root configuration"
+        Just "" -> error "Output needed on root configuration"
+        Just x -> root ++ "/" ++ x
+      index1 = case coreLayout lconfig of
+        Nothing -> error "Layout needed on root configuration"
+        Just "" -> error "Layout needed on root configuration"
+        Just x -> x
+      index = case stripPrefix ("/layout/") index1 of
+        Nothing -> index1
+        Just x -> x
+  -- Now that we have an output, let's make sure the path exists
+  -- and that we clean it out. Hopefully there's nothing else in there
+  -- it would be a shame if it were "/"
+  direxists <- D.doesDirectoryExist output
+  -- Clean up
+  when direxists (D.removeDirectoryRecursive output)
+  -- Make directory
+  D.createDirectory output
+
+  renderMustache root index (output ++ "/index.html") lconfig
+
+  B.writeFile (root ++ "/_compiled.yaml") (Y.encode lconfig)

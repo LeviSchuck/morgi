@@ -9,3 +9,8 @@ collections:
   - posts
 
 output: _site
+
+site:
+  name: Testing Site
+
+title: Home
